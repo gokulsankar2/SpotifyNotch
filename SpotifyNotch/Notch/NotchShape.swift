@@ -75,9 +75,9 @@ struct NotchShape: Shape {
 }
 
 #Preview("Expanded") {
-    NotchShape(topRadius: 10, bottomRadius: 26)
+    NotchShape(topRadius: 8, bottomRadius: 44)
         .fill(.black)
-        .frame(width: 380, height: 180)
+        .frame(width: 425, height: 152)
         .padding(40)
         .background(Color.gray.opacity(0.3))
 }

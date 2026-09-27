@@ -26,9 +26,12 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertEqual(geometry.miniRect.midX, geometry.notchRect.midX, accuracy: 0.001)
     }
 
+    /// The frame carries an extra `topCornerRadius` per side for the shape's
+    /// concave flare, so it is the visible width that gains a full lobe.
     func testMiniRectAddsALobeOnEachSide() {
+        let visibleWidth = geometry.miniRect.width - NotchMetrics.topCornerRadius * 2
         XCTAssertEqual(
-            geometry.miniRect.width,
+            visibleWidth,
             185 + NotchMetrics.miniLobeWidth * 2,
             accuracy: 0.001
         )
@@ -180,15 +183,37 @@ extension NotchGeometryTests {
     /// and its buttons lose hit area. Keep headroom for the real layout.
     func testExpandedRectIsTallEnoughForItsContent() {
         let intrinsic: CGFloat =
-            (geometry.notchHeight + 6)  // top padding, clearing the notch
-            + 74                        // album art
-            + 10 + (3 + 4 + 11)         // spacing + progress bar and labels
-            + 10 + 22                   // spacing + transport buttons
-            + 14                        // bottom padding
+            (geometry.notchHeight + 4)  // top padding, clearing the notch
+            + 64                        // artwork band (art and text column)
+            + 8                         // spacing
+            + 24                        // transport buttons
+            + 12                        // bottom padding
 
         XCTAssertGreaterThanOrEqual(
             geometry.expandedRect.height, intrinsic,
             "Expanded card would clip its transport controls"
         )
+    }
+
+    /// The card radiates symmetrically from the notch's bottom corners:
+    /// the same distance left, right and down, rather than mostly hanging
+    /// downward.
+    func testExpandedCardGrowsEquallyInEveryDirection() {
+        let notch = geometry.notchRect
+        let card = geometry.expandedVisibleRect
+
+        let left = notch.minX - card.minX
+        let right = card.maxX - notch.maxX
+        let down = notch.minY - card.minY
+
+        XCTAssertEqual(left, right, accuracy: 0.5, "Not symmetric horizontally")
+        XCTAssertEqual(left, down, accuracy: 0.5, "Grows further down than sideways")
+        XCTAssertEqual(down, NotchMetrics.expansion, accuracy: 0.5)
+    }
+
+    /// On this machine's 185 x 32 notch the rule yields 425 x 152.
+    func testExpandedCardMatchesTheIntendedProportions() {
+        XCTAssertEqual(geometry.expandedVisibleRect.width, 425, accuracy: 1)
+        XCTAssertEqual(geometry.expandedVisibleRect.height, 152, accuracy: 0.5)
     }
 }

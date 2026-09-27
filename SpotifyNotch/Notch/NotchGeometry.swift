@@ -25,12 +25,21 @@ enum NotchMetrics {
     /// Horizontal padding inside a lobe.
     static let lobePadding: CGFloat = 8
 
-    static let expandedWidth: CGFloat = 380
-    /// Must stay above the expanded card's intrinsic height. The card is
-    /// clipped to the notch silhouette, so anything that overflows is cut
-    /// off — and the first thing to go is the transport row along the
-    /// bottom, which silently shrinks the buttons' hit area.
-    static let expandedHeight: CGFloat = 200
+    /// How far the expanded card grows beyond the hardware notch.
+    ///
+    /// Applied equally to the left, right and bottom, so the card radiates
+    /// symmetrically from the notch's two bottom corners rather than mostly
+    /// hanging downward. On a 185 x 32 notch this yields 425 x 152 — close to
+    /// the proportions of the iPhone Dynamic Island's expanded state.
+    ///
+    /// The expanded card's content must fit inside the resulting height; it
+    /// is clipped to the notch silhouette, and the first thing to be cut off
+    /// is the transport row along the bottom. `NotchGeometryTests` guards it.
+    static let expansion: CGFloat = 120
+
+    /// Lower-corner radius of the expanded card. Much softer than the mini
+    /// state's, which is what gives it the rounded-island read.
+    static let expandedBottomRadius: CGFloat = 44
 
     /// Radius of the overlay's lower corners, matching the hardware notch's
     /// own curvature closely enough to read as one continuous shape.
@@ -81,23 +90,40 @@ struct NotchGeometry: Equatable, Sendable {
         )
     }
 
+    /// `NotchShape` spans the full frame width only at the very top edge and
+    /// sits inset by `topCornerRadius` on each side below the concave flare.
+    /// Frames are widened by that inset so the *visible* shape is the size
+    /// the metrics actually name.
+    private static var flareInset: CGFloat { NotchMetrics.topCornerRadius * 2 }
+
     /// Notch plus both lobes, centred on the hardware notch.
     /// This doubles as the hover-entry zone.
     var miniRect: CGRect {
         centredRect(
-            width: notchRect.width + NotchMetrics.miniLobeWidth * 2,
+            width: notchRect.width + NotchMetrics.miniLobeWidth * 2 + Self.flareInset,
             height: notchRect.height,
             topEdge: notchRect.maxY
         )
     }
 
-    /// The full card, hanging below the screen edge.
+    /// The full card. Grown from the notch by `NotchMetrics.expansion` on the
+    /// left, right and bottom alike, so the distance from each bottom corner
+    /// of the notch to the card's edge is the same in every direction.
     var expandedRect: CGRect {
         centredRect(
-            width: max(NotchMetrics.expandedWidth, miniRect.width),
-            height: NotchMetrics.expandedHeight,
+            width: max(
+                notchRect.width + NotchMetrics.expansion * 2 + Self.flareInset,
+                miniRect.width
+            ),
+            height: notchRect.height + NotchMetrics.expansion,
             topEdge: screenFrame.maxY
         )
+    }
+
+    /// The expanded card as the user actually sees it, with the flare inset
+    /// removed. This is the rect that grows equally in every direction.
+    var expandedVisibleRect: CGRect {
+        expandedRect.insetBy(dx: NotchMetrics.topCornerRadius, dy: 0)
     }
 
     /// The panel is kept at a single fixed frame large enough for every state,
@@ -107,7 +133,7 @@ struct NotchGeometry: Equatable, Sendable {
     var panelFrame: CGRect {
         centredRect(
             width: max(expandedRect.width, miniRect.width),
-            height: NotchMetrics.expandedHeight,
+            height: expandedRect.height,
             topEdge: screenFrame.maxY
         )
     }

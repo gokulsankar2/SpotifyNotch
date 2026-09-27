@@ -46,7 +46,9 @@ struct NotchRootView: View {
         return ZStack(alignment: .top) {
             NotchShape(
                 topRadius: NotchMetrics.topCornerRadius,
-                bottomRadius: presentation == .expanded ? 26 : NotchMetrics.bottomCornerRadius
+                bottomRadius: presentation == .expanded
+                    ? NotchMetrics.expandedBottomRadius
+                    : NotchMetrics.bottomCornerRadius
             )
             .fill(.black)
 
@@ -82,7 +84,7 @@ struct NotchRootView: View {
                         .frame(width: 20, height: 20)
                 }
             }
-            .frame(width: NotchMetrics.miniLobeWidth - NotchMetrics.topCornerRadius)
+            .frame(width: NotchMetrics.miniLobeWidth)
 
             // The hardware notch itself.
             Spacer(minLength: 0)
@@ -94,33 +96,54 @@ struct NotchRootView: View {
                 playbackPosition: progress.progress
             )
             .frame(width: 34, height: 14)
-            .frame(width: NotchMetrics.miniLobeWidth - NotchMetrics.topCornerRadius)
+            .frame(width: NotchMetrics.miniLobeWidth)
         }
         .frame(height: geometry.notchHeight)
     }
 
     // MARK: - Expanded
 
+    /// Laid out for a wide, shallow card: artwork and text share one band,
+    /// with the progress bar tucked under the text rather than on its own
+    /// row, leaving the transport controls a full-width row at the bottom.
     private func expandedContent(geometry: NotchGeometry) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 12) {
                 albumArt
-                metadata
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(playback.snapshot.track?.title ?? "Nothing playing")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Text(secondaryLine)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
+
+                    progressBar
+                }
+                .frame(height: Self.artworkSize)
             }
 
-            progressBar
-
-            // Absorbs any leftover height here rather than letting the
-            // transport row overflow and get clipped.
+            // Absorbs leftover height so the transport row can never be the
+            // thing that overflows and gets clipped.
             Spacer(minLength: 0)
 
             transportControls
         }
-        .padding(.horizontal, NotchMetrics.topCornerRadius + 14)
-        .padding(.top, geometry.notchHeight + 6)
-        .padding(.bottom, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Kept clear of the 44pt lower corners, which curve well inside the
+        // card's full width.
+        .padding(.horizontal, NotchMetrics.topCornerRadius + 20)
+        .padding(.top, geometry.notchHeight + 4)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
+
+    private static let artworkSize: CGFloat = 64
 
     private var albumArt: some View {
         Group {
@@ -132,42 +155,22 @@ struct NotchRootView: View {
                 Color(artwork.currentPalette.primary).opacity(0.3)
             }
         }
-        .frame(width: 74, height: 74)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .frame(width: Self.artworkSize, height: Self.artworkSize)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(.white.opacity(0.08), lineWidth: 1)
         )
     }
 
-    private var metadata: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(playback.snapshot.track?.title ?? "Nothing playing")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-
-            Text(playback.snapshot.track?.artist ?? "")
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.7))
-                .lineLimit(1)
-
-            Text(secondaryLine)
-                .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.45))
-                .lineLimit(1)
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Doubles as the advisory line — a free account or a missing Connect
-    /// device matters more to the user than the album name does.
+    /// One line has to carry artist, device and any advisory, since the
+    /// shallower card has no room for a third row of text. A free account or
+    /// a missing Connect device matters more than the artist name does.
     private var secondaryLine: String {
         if let status = playback.statusMessage { return status }
-        if let device = playback.snapshot.deviceName { return device }
-        return playback.snapshot.track?.album ?? ""
+        let artist = playback.snapshot.track?.artist ?? ""
+        guard let device = playback.snapshot.deviceName, !device.isEmpty else { return artist }
+        return artist.isEmpty ? device : "\(artist) · \(device)"
     }
 
     private var progressBar: some View {
